@@ -90,6 +90,10 @@
     var zone = $('ablage');
     zone.classList.add('laedt');
     KT.import.datei(datei, rolle).then(function (r) {
+      // Die eBAK-Seite kann nach dem Import noch nachfragen (z.B. Versuch bei Word-Dateien)
+      return ebak && ebak.nachImport ? ebak.nachImport(r, datei.name) : r;
+    }).then(function (r) {
+      if (!r) return null;
       return fassungWaehlen(r).then(function (wahl) {
         if (wahl === 'lokal') return;
         r.daten.meta.gespeichert = new Date().toISOString();

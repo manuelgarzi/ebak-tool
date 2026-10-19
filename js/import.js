@@ -345,7 +345,10 @@
         if (a.typ === 'zeitplan') {
           var zp = zeitplanAusWord(f[a.wordTagZeitpunkte], f[a.wordTagSchritte]);
           s.zeitplan = zp.zeilen;
-          if (!zp.gepaart) hinweise.push('Der Zeitplan liess sich nicht eindeutig in Zeilen aufteilen und wurde als ein Block übernommen. Bitte teilen Sie ihn in einzelne Zeilen auf.');
+          if (!zp.gepaart) {
+            hinweise.push('Der Zeitplan liess sich nicht eindeutig in Zeilen aufteilen und wurde als ein Block übernommen. ' +
+              (rolle === 'stud' ? 'Bitte teilen Sie ihn in einzelne Zeilen auf.' : 'Er wird so angezeigt, wie er in der Word-Datei stand.'));
+          }
           return;
         }
         var delta = f[a.wordTag] || KT.delta.leer();

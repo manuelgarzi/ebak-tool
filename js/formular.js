@@ -18,6 +18,19 @@
     return o ? o.text : '';
   }
 
+  // «Datenschutz: Das Konzept erwähnt keine Aspekte des Datenschutzes», «Umfang: Umfang nicht eingehalten»
+  function auswahlSatz(key, wert) {
+    var label = KT.vorlage.auswahlen[key].label;
+    var text = auswahlText(key, wert);
+    if (!text) return '';
+    if (/…$/.test(label) && /^…/.test(text)) return label.replace(/\s*…$/, '') + ' ' + text.replace(/^…\s*/, '');
+    return label + ': ' + text;
+  }
+
+  function auswahlKeys(kriterien) {
+    return kriterien.filter(function (k) { return k && k.auswahl; }).map(function (k) { return k.auswahl; });
+  }
+
   /*
    * Zeigt das Formular im Container an.
    * beiAenderung(): wird nach jeder Eingabe aufgerufen (Autosave, Umfangsanzeige).
@@ -56,27 +69,38 @@
       }).element;
     }
 
-    function verlaufFuer(feldId) {
-      var eintraege = daten.verlauf.slice().reverse().filter(function (h) { return !D.istLeer(h.ebak[feldId]); });
+    // Frühere Beurteilungen eines Abschnitts: Text und Auswahlen (z.B. Datenschutz, Umfang)
+    function verlaufFuer(feldId, keys) {
+      keys = keys || [];
+      var eintraege = daten.verlauf.slice().reverse().filter(function (h) {
+        return !D.istLeer(h.ebak[feldId]) || keys.some(function (k) { return !!h.ebak[k]; });
+      });
       if (!eintraege.length) return null;
       return el('div', { class: 'verlauf' }, eintraege.map(function (h, i) {
         var det = el('details', { class: 'verlauf-eintrag', open: i === 0 }, [
           el('summary', { text: 'Rückmeldung zu Versuch ' + h.versuch + (h.abgeschlossen ? ' (' + KT.ui.datumKurz(h.abgeschlossen) + ')' : '') })
         ]);
-        det.appendChild(lesetext(h.ebak[feldId]));
+        if (!D.istLeer(h.ebak[feldId])) det.appendChild(lesetext(h.ebak[feldId]));
+        var saetze = keys.map(function (k) { return auswahlSatz(k, h.ebak[k]); }).filter(Boolean);
+        if (saetze.length) det.appendChild(el('ul', { class: 'verlauf-auswahlen' }, saetze.map(function (t) { return el('li', { text: t }); })));
         return det;
       }));
     }
 
-    // Nur Anzeige; bearbeitbar wird die Auswahl durch die eBAK-Erweiterung
+    // Nur Anzeige; bearbeitbar wird die Auswahl durch die eBAK-Erweiterung.
+    // Studierende sehen die Auswahl der letzten Beurteilung (ihre aktuelle Beurteilung ist noch leer).
     function auswahlFeld(key, ziel) {
       if (ext) return ext.auswahlFeld(key, ziel, werkzeuge);
       var a = v.auswahlen[key];
-      var fs = el('fieldset', { class: 'auswahl' }, [el('legend', { text: a.label })]);
+      var letzte = daten.verlauf.length ? daten.verlauf[daten.verlauf.length - 1] : null;
+      var wert = ziel[key] || (letzte ? letzte.ebak[key] : '');
+      var ausVerlauf = !ziel[key] && letzte && !!letzte.ebak[key];
+      var fs = el('fieldset', { class: 'auswahl' + (ausVerlauf ? ' aus-verlauf' : '') },
+        [el('legend', { text: a.label + (ausVerlauf ? ' (Beurteilung Versuch ' + letzte.versuch + ')' : '') })]);
       a.optionen.forEach(function (o) {
         var input = el('input', { type: 'radio', name: 'auswahl-' + key, value: o.wert, disabled: true });
-        input.checked = ziel[key] === o.wert;
-        fs.appendChild(el('label', { class: 'auswahl-option' }, [input, el('span', { text: o.text })]));
+        input.checked = wert === o.wert;
+        fs.appendChild(el('label', { class: 'auswahl-option' + (input.checked ? ' gewaehlt' : '') }, [input, el('span', { text: o.text })]));
       });
       return fs;
     }
@@ -93,11 +117,11 @@
       return box;
     }
 
-    function rueckmeldungBox(feldId, titel) {
+    function rueckmeldungBox(feldId, titel, keys) {
       var box = el('div', { class: 'rueckmeldung' }, [el('h3', { text: 'Rückmeldungen' })]);
       box.appendChild(ext ? ext.rueckmeldung(feldId, titel, werkzeuge)
         : el('p', { class: 'platzhalter', text: 'Wird von der eBAK ausgefüllt.' }));
-      var verlauf = verlaufFuer(feldId);
+      var verlauf = verlaufFuer(feldId, keys);
       if (verlauf) box.appendChild(verlauf);
       return box;
     }
@@ -106,7 +130,7 @@
     var werkzeuge = { el: el, D: D, daten: daten, geaendert: geaendert, textEditor: textEditor, lesetext: lesetext };
 
     function raster(kriterien, feldId, titel) {
-      return el('div', { class: 'raster' }, [kriterienListe(kriterien), rueckmeldungBox(feldId, titel)]);
+      return el('div', { class: 'raster' }, [kriterienListe(kriterien), rueckmeldungBox(feldId, titel, auswahlKeys(kriterien))]);
     }
 
     function karte(titel, untertitel, kinder, klasse) {
@@ -271,5 +295,5 @@
     };
   }
 
-  KT.formular = { anzeigen: anzeigen, auswahlText: auswahlText, abschnittLabel: abschnittLabel };
+  KT.formular = { anzeigen: anzeigen, auswahlText: auswahlText, auswahlSatz: auswahlSatz, abschnittLabel: abschnittLabel };
 })(window.KT = window.KT || {});

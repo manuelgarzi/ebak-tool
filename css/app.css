@@ -252,6 +252,12 @@ input[type="text"]:focus, input[type="password"]:focus, textarea:focus, select:f
 .auswahl input:disabled + span { color: var(--g700); }
 .auswahl .link-knopf { font-size: .8rem; margin-top: 4px; }
 .rolle-stud .auswahl { background: transparent; }
+.auswahl-option.gewaehlt span { color: var(--g900); font-weight: 600; }
+.auswahl input:disabled:checked + span::before { content: '✓ '; color: var(--dark-mint); font-weight: 700; }
+.auswahl.aus-verlauf { border-color: #EDE6A6; background: var(--light-gelb); }
+.auswahl.aus-verlauf legend { color: var(--dark-gelb); }
+.verlauf-auswahlen { margin: 6px 0 0; padding-left: 1.2em; font-size: .9rem; }
+.verlauf-auswahlen li { margin-bottom: 2px; }
 
 /* Verlauf */
 .verlauf { margin-top: 12px; }
