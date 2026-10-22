@@ -30,6 +30,7 @@
     ],
     studienbereiche: [
       'Erziehungswissenschaften',
+      'EW - Medien und Informatik',
       'GMBS Bewegung und Sport',
       'GMBS Gestalten',
       'GMBS Musik',
