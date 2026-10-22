@@ -2,11 +2,13 @@
  * Texteditor auf Basis von Quill mit eingeschränkten Formaten.
  * Beim Einfügen aus Word bleiben fett, kursiv, unterstrichen, Listen und Titel erhalten,
  * alles andere (Farben, Schriften, Bilder, Links, Tabellen) wird entfernt.
+ * Markierungen der eBAK werden angezeigt und bleiben am Text, lassen sich hier aber
+ * weder setzen noch entfernen (auch nicht über «Formatierung entfernen» oder Einfügen).
  */
 (function (KT) {
   'use strict';
 
-  var FORMATE = ['bold', 'italic', 'underline', 'header', 'list', 'indent'];
+  var FORMATE = ['bold', 'italic', 'underline', 'header', 'list', 'indent', 'markierung'];
 
   var KNOEPFE = [
     [['ql-bold', null, 'Fett (Ctrl/Cmd+B)'], ['ql-italic', null, 'Kursiv (Ctrl/Cmd+I)'], ['ql-underline', null, 'Unterstrichen (Ctrl/Cmd+U)']],
@@ -45,6 +47,7 @@
     var flaeche = document.createElement('div');
     huelle.appendChild(leiste);
     huelle.appendChild(flaeche);
+    KT.markierung.quillRegistrieren();
 
     var quill = new window.Quill(flaeche, {
       theme: 'snow',
@@ -57,12 +60,22 @@
       }
     });
 
-    // Alle Titelebenen beim Einfügen auf den einen erlaubten Zwischentitel abbilden
+    // Alle Titelebenen beim Einfügen auf den einen erlaubten Zwischentitel abbilden,
+    // eingefügte Markierungen verwerfen (sonst entstünden doppelte Markierungen)
     quill.clipboard.addMatcher(Node.ELEMENT_NODE, function (node, delta) {
       delta.ops.forEach(function (op) {
         if (op.attributes && op.attributes.header) op.attributes.header = 3;
+        if (op.attributes && op.attributes.markierung) delete op.attributes.markierung;
       });
       return delta;
+    });
+
+    // «Formatierung entfernen» lässt Markierungen der eBAK stehen
+    quill.getModule('toolbar').addHandler('clean', function () {
+      var r = quill.getSelection(true);
+      if (!r) return;
+      if (r.length) ['bold', 'italic', 'underline'].forEach(function (f) { quill.formatText(r.index, r.length, f, false, 'user'); });
+      quill.formatLine(r.index, Math.max(r.length, 1), { header: false, list: false, indent: false }, 'user');
     });
 
     quill.setContents(KT.delta.bereinigen(optionen.delta), 'silent');
@@ -71,7 +84,21 @@
     quill.root.setAttribute('spellcheck', 'true');
     quill.root.setAttribute('lang', 'de-CH');
 
-    quill.on('text-change', function () {
+    KT.markierung.nummernBereinigen(quill.root);
+
+    quill.on('text-change', function (aenderung, alt, quelle) {
+      // Neu getippter Text übernimmt keine Markierung der angrenzenden Stelle
+      if (quelle === 'user') {
+        var pos = 0;
+        aenderung.ops.forEach(function (op) {
+          if (op.retain) pos += op.retain;
+          else if (typeof op.insert === 'string') {
+            if (op.attributes && op.attributes.markierung) quill.formatText(pos, op.insert.length, 'markierung', false, 'silent');
+            pos += op.insert.length;
+          }
+        });
+      }
+      KT.markierung.nummernBereinigen(quill.root);
       if (optionen.beiAenderung) optionen.beiAenderung({ ops: JSON.parse(JSON.stringify(quill.getContents().ops)) });
     });
 

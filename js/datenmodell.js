@@ -56,6 +56,8 @@
       studierende: leereStudierende(),
       ebak: leereEbak(),
       verlauf: [],
+      markierungen: [],
+      markierungNrBasis: 0,
       meta: { toolVersion: TOOL_VERSION, erstellt: jetzt, gespeichert: jetzt, eingereicht: null, beurteilt: null }
     };
   }
@@ -120,6 +122,28 @@
       };
     }) : [];
 
+    var felder = textFelder();
+    var gesehen = {};
+    d.markierungen = Array.isArray(roh.markierungen) ? roh.markierungen.slice(0, 500).filter(function (mk) {
+      var ok = mk && /^m[a-z0-9]{1,24}$/.test(mk.id) && !gesehen[mk.id] && felder.indexOf(mk.feld) >= 0 &&
+        /^(gelb|gruen|blau|rosa)$/.test(mk.farbe);
+      if (ok) gesehen[mk.id] = true;
+      return ok;
+    }).map(function (mk) {
+      var nr = parseInt(mk.nr, 10);
+      return {
+        id: mk.id,
+        feld: mk.feld,
+        farbe: mk.farbe,
+        kommentar: str(mk.kommentar, 5000),
+        versuch: Math.max(1, Math.min(20, parseInt(mk.versuch, 10) || 1)),
+        nr: nr > 0 && nr < 10000 ? nr : null
+      };
+    }) : [];
+
+    var basis = parseInt(roh.markierungNrBasis, 10);
+    d.markierungNrBasis = basis > 0 && basis < 10000 ? basis : 0;
+
     var m = roh.meta || {};
     d.meta.erstellt = datum(m.erstellt) || d.meta.erstellt;
     d.meta.gespeichert = datum(m.gespeichert) || d.meta.gespeichert;
@@ -139,6 +163,7 @@
   function fuerStudierendeOeffnen(d) {
     var hinweise = [];
     if (d.status === 'beurteilt') {
+      if (KT.markierung) KT.markierung.einfrieren(d);
       d.verlauf.push({ versuch: d.versuch, ebak: d.ebak, abgeschlossen: d.meta.beurteilt, quelle: 'tool' });
       hinweise.push('Die Rückmeldung zu Versuch ' + d.versuch + ' wurde übernommen und ist bei jedem Abschnitt sichtbar. Sie bearbeiten jetzt Versuch ' + (d.versuch + 1) + '.');
       d.versuch += 1;

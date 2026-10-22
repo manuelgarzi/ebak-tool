@@ -33,14 +33,50 @@
 
   // ---------- Text ----------
 
+  // Nummern der Markierungen des Dokuments, das gerade erzeugt wird (siehe dokument())
+  var nummern = {};
+
   function runs(rs) {
-    return rs.map(function (r) {
+    var ergebnis = [];
+    rs.forEach(function (r) {
       var t = { text: r.text.replace(/\t/g, '    ') };
       if (r.bold) t.bold = true;
       if (r.italic) t.italics = true;
       if (r.underline) t.decoration = 'underline';
-      return t;
+      if (r.markierung) t.background = KT.markierung.farbwert(r.markierung.split(':')[1]);
+      ergebnis.push(t);
+      var nr = r.markEnde && r.markierung ? nummern[KT.markierung.idVon(r.markierung)] : null;
+      // pdfmake verkleinert hochgestellten Text auf 58 %: 13 pt ergibt rund 7.5 pt
+      if (nr) ergebnis.push({ text: String(nr), sup: true, bold: true, fontSize: 13, color: FARBE.deep });
     });
+    return ergebnis;
+  }
+
+  // Kommentare zu den Markierungen eines Abschnitts (nur nummerierte)
+  function kommentare(daten, feld) {
+    var liste = KT.markierung.eintraege(daten, feld, true);
+    if (!liste.length) return [];
+    return [{ text: 'Kommentare zu Markierungen', bold: true, fontSize: 8.5, color: FARBE.deep, margin: [0, 8, 0, 3] }].concat(liste.map(function (e) {
+      var zusatz = [];
+      if (e.m.versuch < daten.versuch) zusatz.push('Versuch ' + e.m.versuch);
+      if (e.entfernt) zusatz.push('markierte Textstelle entfernt');
+      return {
+        columns: [
+          { width: 20, text: '\u00A0' + e.nr + '\u00A0', bold: true, fontSize: 8.5, background: KT.markierung.farbwert(e.m.farbe) },
+          {
+            width: '*',
+            stack: [
+              e.entfernt ? null : { text: '«' + e.auszug + '»', italics: true, fontSize: 8, color: FARBE.textHell },
+              { text: einfach(e.m.kommentar), fontSize: 9 },
+              zusatz.length ? { text: zusatz.join(', '), fontSize: 7.5, color: FARBE.textHell } : null
+            ].filter(Boolean)
+          }
+        ],
+        columnGap: 6,
+        margin: [0, 0, 0, 4],
+        unbreakable: true
+      };
+    }));
   }
 
   function block(b) {
@@ -155,7 +191,7 @@
     body.push(kopfzeileKriterien());
     body.push([
       { stack: [kriterien(a.kriterien, daten.ebak)], fillColor: FARBE.grau },
-      { stack: rueckmeldung(daten, a.rueckmeldung), fillColor: FARBE.grau }
+      { stack: rueckmeldung(daten, a.rueckmeldung).concat(a.typ === 'zeitplan' ? [] : kommentare(daten, a.feld)), fillColor: FARBE.grau }
     ]);
     return tabelle(body);
   }
@@ -225,6 +261,7 @@
 
   function dokument(daten) {
     var v = KT.vorlage;
+    nummern = KT.markierung.nummern(daten);
     var entwurf = daten.status === 'entwurf' || daten.status === 'in-beurteilung';
     var inhalt = [
       { text: v.id, bold: true, color: FARBE.deep, fontSize: 10 },

@@ -117,10 +117,16 @@
       return box;
     }
 
-    function rueckmeldungBox(feldId, titel, keys) {
+    function rueckmeldungBox(feldId, titel, keys, studFeld) {
       var box = el('div', { class: 'rueckmeldung' }, [el('h3', { text: 'Rückmeldungen' })]);
       box.appendChild(ext ? ext.rueckmeldung(feldId, titel, werkzeuge)
         : el('p', { class: 'platzhalter', text: 'Wird von der eBAK ausgefüllt.' }));
+      // Kommentare zu Markierungen im Text der Studierenden
+      if (studFeld) {
+        var kommentare = !ext ? KT.markierung.listeLesen(daten, studFeld)
+          : ext.kommentare ? ext.kommentare(studFeld, werkzeuge) : KT.markierung.listeLesen(daten, studFeld);
+        if (kommentare) box.appendChild(kommentare);
+      }
       var verlauf = verlaufFuer(feldId, keys);
       if (verlauf) box.appendChild(verlauf);
       return box;
@@ -129,8 +135,8 @@
     // Bausteine, welche die eBAK-Erweiterung mitbenutzt
     var werkzeuge = { el: el, D: D, daten: daten, geaendert: geaendert, textEditor: textEditor, lesetext: lesetext };
 
-    function raster(kriterien, feldId, titel) {
-      return el('div', { class: 'raster' }, [kriterienListe(kriterien), rueckmeldungBox(feldId, titel, auswahlKeys(kriterien))]);
+    function raster(kriterien, feldId, titel, studFeld) {
+      return el('div', { class: 'raster' }, [kriterienListe(kriterien), rueckmeldungBox(feldId, titel, auswahlKeys(kriterien), studFeld)]);
     }
 
     function karte(titel, untertitel, kinder, klasse) {
@@ -208,6 +214,8 @@
     // ---------- Aufbau ----------
 
     KT.ui.leeren(container);
+    // Nummern der Markierungen für die Anzeige im Editor der Studierenden
+    KT.markierung.anzeigeNummernSetzen(KT.markierung.nummern(daten));
 
     container.appendChild(el('section', { class: 'kopfbereich' }, [
       el('p', { class: 'vorlage-id', text: v.id }),
@@ -270,13 +278,13 @@
         stud.appendChild(textEditor(daten.studierende[a.feld], titel, 'Inhalt des Abschnitts «' + titel + '» hier schreiben oder aus Word einfügen.',
           function (neu) { daten.studierende[a.feld] = neu; zaehlerSetzen(a.feld); }));
       } else {
-        stud.appendChild(lesetext(daten.studierende[a.feld]));
+        stud.appendChild(ext.studierendenText ? ext.studierendenText(a, werkzeuge) : lesetext(daten.studierende[a.feld]));
       }
       kinder.push(stud);
       zaehler[a.feld] = el('p', { class: 'zaehler', 'aria-live': 'polite' });
       kinder.push(zaehler[a.feld]);
       zaehlerSetzen(a.feld);
-      kinder.push(raster(a.kriterien, a.rueckmeldung, titel));
+      kinder.push(raster(a.kriterien, a.rueckmeldung, titel, a.typ === 'zeitplan' ? null : a.feld));
       container.appendChild(karte((a.nr ? a.nr + '. ' : '') + a.titel, a.untertitel, kinder, 'abschnitt'));
     });
 

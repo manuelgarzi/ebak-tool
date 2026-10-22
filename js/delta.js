@@ -1,11 +1,13 @@
 /*
  * Hilfsfunktionen für Langtexte im Quill-Delta-Format ({ ops: [...] }).
- * Erlaubt sind nur: fett, kursiv, unterstrichen, Zwischentitel, Listen (mit Einzug).
+ * Erlaubt sind nur: fett, kursiv, unterstrichen, Zwischentitel, Listen (mit Einzug)
+ * sowie Markierungen der eBAK («markierung»: "<id>:<farbe>", siehe markierung.js).
  */
 (function (KT) {
   'use strict';
 
   var MAX_EINZUG = 4;
+  var MARKIERUNG = /^m[a-z0-9]{1,24}:(gelb|gruen|blau|rosa)$/;
 
   function leer() {
     return { ops: [{ insert: '\n' }] };
@@ -17,6 +19,7 @@
     if (a.bold === true) r.bold = true;
     if (a.italic === true) r.italic = true;
     if (a.underline === true) r.underline = true;
+    if (typeof a.markierung === 'string' && MARKIERUNG.test(a.markierung)) r.markierung = a.markierung;
     return r;
   }
 
@@ -50,23 +53,39 @@
     return { ops: ops };
   }
 
-  // Zerlegt ein Delta in Zeilen mit Inline-Abschnitten und Blockformat.
+  /*
+   * Zerlegt ein Delta in Zeilen mit Inline-Abschnitten und Blockformat.
+   * Jeder Abschnitt kennt seine Position im Delta (start); der letzte Abschnitt
+   * einer Markierung trägt markEnde, damit dort die Kommentarnummer steht.
+   */
   function zeilen(delta) {
     var ergebnis = [];
     var runs = [];
+    var pos = 0;
+    var letzte = {};
     var ops = (delta && delta.ops) || [];
     ops.forEach(function (op) {
       if (typeof op.insert !== 'string') return;
       var teile = op.insert.split('\n');
       var inline = inlineAttribute(op.attributes);
       teile.forEach(function (teil, i) {
-        if (teil) runs.push({ text: teil, bold: !!inline.bold, italic: !!inline.italic, underline: !!inline.underline });
+        if (teil) {
+          var run = { text: teil, bold: !!inline.bold, italic: !!inline.italic, underline: !!inline.underline, start: pos };
+          if (inline.markierung) {
+            run.markierung = inline.markierung;
+            letzte[inline.markierung.split(':')[0]] = run;
+          }
+          runs.push(run);
+          pos += teil.length;
+        }
         if (i < teile.length - 1) {
           ergebnis.push({ runs: runs, block: blockAttribute(op.attributes) });
           runs = [];
+          pos += 1;
         }
       });
     });
+    Object.keys(letzte).forEach(function (id) { letzte[id].markEnde = true; });
     if (runs.length) ergebnis.push({ runs: runs, block: {} });
     while (ergebnis.length && !ergebnis[ergebnis.length - 1].runs.length && !ergebnis[ergebnis.length - 1].block.list) ergebnis.pop();
     return ergebnis;
@@ -136,8 +155,13 @@
     return { ops: [{ insert: s.charAt(s.length - 1) === '\n' ? s : s + '\n' }] };
   }
 
-  // Schreibgeschützte Darstellung als DOM (ohne innerHTML)
-  function zuDom(delta) {
+  /*
+   * Schreibgeschützte Darstellung als DOM (ohne innerHTML).
+   * optionen.nummern: { markierungsId: Nummer } für hochgestellte Kommentarnummern
+   * optionen.textknoten: Array, das [Textknoten, Position im Delta] aufnimmt (für die Auswahl beim Markieren)
+   */
+  function zuDom(delta, optionen) {
+    var opt = optionen || {};
     var frag = document.createDocumentFragment();
     var bl = bloecke(delta);
     if (!bl.length || istLeer(delta)) {
@@ -147,39 +171,58 @@
       frag.appendChild(p);
       return frag;
     }
-    bl.forEach(function (b) { frag.appendChild(blockZuDom(b)); });
+    bl.forEach(function (b) { frag.appendChild(blockZuDom(b, opt)); });
     return frag;
   }
 
-  function runsZuDom(runs, ziel) {
+  function runsZuDom(runs, ziel, opt) {
     runs.forEach(function (r) {
-      var knoten = document.createTextNode(r.text);
+      var text = document.createTextNode(r.text);
+      if (opt.textknoten) opt.textknoten.push([text, r.start]);
+      var knoten = text;
       if (r.underline) { var u = document.createElement('u'); u.appendChild(knoten); knoten = u; }
       if (r.italic) { var em = document.createElement('em'); em.appendChild(knoten); knoten = em; }
       if (r.bold) { var st = document.createElement('strong'); st.appendChild(knoten); knoten = st; }
+      if (r.markierung) {
+        var teile = r.markierung.split(':');
+        var mark = document.createElement('mark');
+        mark.className = 'mk mk-' + teile[1];
+        mark.setAttribute('data-mk', teile[0]);
+        mark.appendChild(knoten);
+        knoten = mark;
+      }
       ziel.appendChild(knoten);
+      var nr = r.markEnde && opt.nummern ? opt.nummern[r.markierung.split(':')[0]] : null;
+      if (nr) {
+        var sup = document.createElement('sup');
+        sup.className = 'mk-nr';
+        sup.setAttribute('data-mk', r.markierung.split(':')[0]);
+        sup.textContent = nr;
+        ziel.appendChild(sup);
+      }
     });
     if (!runs.length) ziel.appendChild(document.createElement('br'));
     return ziel;
   }
 
-  function blockZuDom(b) {
+  function blockZuDom(b, opt) {
     if (b.typ === 'liste') {
       var l = document.createElement(b.art === 'ordered' ? 'ol' : 'ul');
       b.eintraege.forEach(function (e) {
         if (e.typ === 'liste') {
           var letzter = l.lastElementChild || l.appendChild(document.createElement('li'));
-          letzter.appendChild(blockZuDom(e));
+          letzter.appendChild(blockZuDom(e, opt));
         } else {
-          l.appendChild(runsZuDom(e.runs, document.createElement('li')));
+          l.appendChild(runsZuDom(e.runs, document.createElement('li'), opt));
         }
       });
       return l;
     }
-    return runsZuDom(b.runs, document.createElement(b.typ === 'titel' ? 'h4' : 'p'));
+    return runsZuDom(b.runs, document.createElement(b.typ === 'titel' ? 'h4' : 'p'), opt);
   }
 
   KT.delta = {
+    MARKIERUNG: MARKIERUNG,
     leer: leer,
     bereinigen: bereinigen,
     zeilen: zeilen,

@@ -329,3 +329,47 @@ input[type="text"]:focus, input[type="password"]:focus, textarea:focus, select:f
 .zugang-merken { display: flex; gap: 8px; align-items: flex-start; font-size: .88rem; color: var(--g700); margin-bottom: 14px; cursor: pointer; }
 .zugang-merken input { margin-top: .25em; accent-color: var(--dark-mint); }
 .zugang-karte .knopf { width: 100%; }
+
+/* ---------- Markierungen der eBAK ---------- */
+
+mark.mk { color: inherit; padding: 0 1px; border-radius: 2px; }
+.mk-gelb { background: #FFE58A; }
+.mk-gruen { background: #BDE5B5; }
+.mk-blau { background: #BCE0F5; }
+.mk-rosa { background: #F7C4CC; }
+sup.mk-nr { font-size: .7em; font-weight: 700; color: var(--deep); margin-left: 1px; }
+/* Im Editor der Studierenden: Nummer nur hinter dem letzten Teilstück */
+.ql-editor mark.mk[data-nr]::after { content: attr(data-nr); font-size: .7em; font-weight: 700; color: var(--deep); vertical-align: super; margin-left: 1px; }
+.ql-editor mark.mk.mk-ohne-nr::after { content: none; }
+
+.markier-bereich { border: 1px solid var(--g200); border-radius: 4px; background: var(--weiss); }
+.markier-bereich > .lesetext { padding: 12px 14px; }
+.markier-leiste {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px;
+  border-bottom: 1px solid var(--g200); background: var(--g050); border-radius: 4px 4px 0 0;
+}
+.markier-label { font-size: .82rem; font-weight: 700; color: var(--deep); }
+.markier-knopf {
+  font: inherit; font-size: .8rem; font-weight: 600; color: var(--g900); cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, .15); border-radius: 999px; padding: 3px 12px;
+}
+.markier-knopf:hover { box-shadow: 0 0 0 2px var(--deep) inset; }
+.markier-hinweis { font-size: .78rem; color: var(--g700); margin-left: 4px; }
+.markierbar mark.mk { cursor: pointer; }
+
+.kommentare { margin-top: 14px; border-top: 1px solid var(--g300); padding-top: 10px; }
+.kommentar-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.kommentar { display: flex; gap: 10px; align-items: flex-start; background: var(--weiss); border-radius: 4px; padding: 8px 10px; }
+.kommentar.frueher { background: var(--light-gelb); }
+.kommentar.blinken { animation: blinken 1.2s ease-out; }
+@keyframes blinken { from { box-shadow: 0 0 0 3px var(--bright); } to { box-shadow: 0 0 0 0 transparent; } }
+.kommentar-nr {
+  flex: none; min-width: 26px; height: 26px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .85rem; color: var(--deep); padding: 0 6px;
+}
+.kommentar-inhalt { flex: 1; min-width: 0; }
+.kommentar-auszug { font-size: .82rem; font-style: italic; color: var(--g700); margin: 0 0 4px; overflow-wrap: anywhere; }
+.kommentar-text { margin: 0 0 4px; font-size: .92rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.kommentar-versuch { font-size: .78rem; font-weight: 600; color: var(--dark-gelb); margin: 0 0 4px; }
+.kommentar textarea { min-height: 2.6em; margin-bottom: 4px; }
+.kommentar .link-knopf { font-size: .8rem; }
